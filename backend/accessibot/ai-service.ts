@@ -2,7 +2,7 @@ import { secret } from "encore.dev/config";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { cacheFix, getCachedFix, generateIssueHash } from "./cache";
-import { openAIRateLimiter, BatchProcessor } from "./rate-limiter";
+import { openAIRateLimiter, BatchProcessor, BatchProcessorConfig } from "./rate-limiter";
 import type { AccessibilityIssue } from "./analyze";
 
 const openAIKey = secret("OpenAIKey");
@@ -18,10 +18,22 @@ interface BatchAIResponse {
   fixedCode: string;
 }
 
-// Batch processor for AI requests - process up to 5 issues at once with 2 second delay
+// Enhanced batch processor configuration with dynamic sizing
+const batchProcessorConfig: BatchProcessorConfig = {
+  initialBatchSize: 3,
+  minBatchSize: 1,
+  maxBatchSize: 8,
+  initialDelayMs: 2000,
+  minDelayMs: 1000,
+  maxDelayMs: 5000,
+  targetResponseTimeMs: 15000, // 15 seconds target
+  maxErrorRate: 0.2, // 20% max error rate
+  adjustmentInterval: 3, // Adjust every 3 batches
+};
+
+// Enhanced batch processor with priority queuing and dynamic sizing
 const aiBatchProcessor = new BatchProcessor<BatchAIRequest, BatchAIResponse>(
-  5, // batch size
-  2000, // 2 second delay
+  batchProcessorConfig,
   processBatchAIRequests
 );
 
@@ -45,11 +57,14 @@ export async function getAIFixForIssue(issue: AccessibilityIssue): Promise<strin
   console.log(`OpenAI API requests remaining: ${rateLimitResult.remaining}`);
 
   try {
-    // Add to batch processor
+    // Determine priority based on severity
+    const priority = getPriorityFromSeverity(issue.severity);
+    
+    // Add to batch processor with priority
     const result = await aiBatchProcessor.add({
       issue,
       issueHash,
-    });
+    }, priority);
     
     // Cache the result
     await cacheFix(issueHash, result.fixedCode);
@@ -61,12 +76,26 @@ export async function getAIFixForIssue(issue: AccessibilityIssue): Promise<strin
   }
 }
 
+function getPriorityFromSeverity(severity: AccessibilityIssue['severity']): number {
+  switch (severity) {
+    case 'high':
+      return 10;
+    case 'medium':
+      return 5;
+    case 'low':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 async function processBatchAIRequests(requests: BatchAIRequest[]): Promise<BatchAIResponse[]> {
   if (requests.length === 0) {
     return [];
   }
 
-  console.log(`Processing batch of ${requests.length} AI requests`);
+  console.log(`Processing prioritized batch of ${requests.length} AI requests`);
+  console.log(`Request priorities: ${requests.map(r => `${r.issue.severity}(${getPriorityFromSeverity(r.issue.severity)})`).join(', ')}`);
 
   // Create a combined prompt for all issues in the batch
   const batchPrompt = createBatchPrompt(requests.map(r => r.issue));
@@ -91,7 +120,13 @@ async function processBatchAIRequests(requests: BatchAIRequest[]): Promise<Batch
 }
 
 function createBatchPrompt(issues: AccessibilityIssue[]): string {
-  const prompt = `You are an accessibility expert. I will provide you with ${issues.length} accessibility issues. For each issue, provide ONLY the corrected HTML code snippet, no explanations. Format your response as follows:
+  // Sort issues by severity for better prompt organization
+  const sortedIssues = [...issues].sort((a, b) => {
+    const severityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+    return severityOrder[b.severity] - severityOrder[a.severity];
+  });
+
+  const prompt = `You are an accessibility expert. I will provide you with ${sortedIssues.length} accessibility issues sorted by severity (high to low). For each issue, provide ONLY the corrected HTML code snippet, no explanations. Format your response as follows:
 
 ISSUE_1:
 [corrected HTML for issue 1]
@@ -101,11 +136,12 @@ ISSUE_2:
 
 And so on...
 
-Here are the issues:
+Here are the issues in order of severity:
 
-${issues.map((issue, index) => `
+${sortedIssues.map((issue, index) => `
 ISSUE_${index + 1}:
 Type: ${issue.type}
+Severity: ${issue.severity.toUpperCase()}
 Description: ${issue.description}
 Current Element: ${issue.element}
 `).join('\n')}
@@ -163,7 +199,12 @@ async function fallbackIndividualRequests(requests: BatchAIRequest[]): Promise<B
   
   const results: BatchAIResponse[] = [];
   
-  for (const request of requests) {
+  // Process in priority order (high severity first)
+  const sortedRequests = [...requests].sort((a, b) => {
+    return getPriorityFromSeverity(b.issue.severity) - getPriorityFromSeverity(a.issue.severity);
+  });
+  
+  for (const request of sortedRequests) {
     try {
       // Add delay between individual requests to avoid overwhelming the API
       if (results.length > 0) {
@@ -175,6 +216,7 @@ async function fallbackIndividualRequests(requests: BatchAIRequest[]): Promise<B
         prompt: `You are an accessibility expert. For the following accessibility issue, provide a specific, improved code snippet that fixes the problem:
 
 Issue Type: ${request.issue.type}
+Severity: ${request.issue.severity.toUpperCase()}
 Description: ${request.issue.description}
 Current Element: ${request.issue.element}
 
@@ -202,7 +244,7 @@ Provide only the corrected HTML code snippet, no explanations.`,
 export async function enhanceIssuesWithAI(issues: AccessibilityIssue[]): Promise<void> {
   if (issues.length === 0) return;
 
-  console.log(`Enhancing ${issues.length} issues with AI fixes`);
+  console.log(`Enhancing ${issues.length} issues with AI fixes using priority processing`);
 
   const apiKey = openAIKey();
   if (!apiKey || apiKey.trim() === '') {
@@ -210,8 +252,19 @@ export async function enhanceIssuesWithAI(issues: AccessibilityIssue[]): Promise
     return;
   }
 
+  // Log batch processor stats
+  const stats = aiBatchProcessor.getStats();
+  const queueSummary = aiBatchProcessor.getQueueSummary();
+  console.log('Batch processor stats:', stats);
+  console.log('Queue summary by priority:', queueSummary);
+
+  // Sort issues by severity for processing
+  const sortedIssues = [...issues].sort((a, b) => {
+    return getPriorityFromSeverity(b.severity) - getPriorityFromSeverity(a.severity);
+  });
+
   // Process all issues through the AI service
-  const promises = issues.map(async (issue) => {
+  const promises = sortedIssues.map(async (issue) => {
     try {
       const aiFixedCode = await getAIFixForIssue(issue);
       if (aiFixedCode && aiFixedCode.trim() !== '') {
@@ -226,5 +279,16 @@ export async function enhanceIssuesWithAI(issues: AccessibilityIssue[]): Promise
   // Wait for all AI enhancements to complete
   await Promise.allSettled(promises);
 
-  console.log('AI enhancement completed');
+  // Log final stats after processing
+  const finalStats = aiBatchProcessor.getStats();
+  console.log('AI enhancement completed. Final batch processor stats:', finalStats);
+}
+
+// Export batch processor stats for monitoring
+export function getBatchProcessorStats() {
+  return {
+    stats: aiBatchProcessor.getStats(),
+    pendingCount: aiBatchProcessor.getPendingCount(),
+    queueSummary: aiBatchProcessor.getQueueSummary(),
+  };
 }
