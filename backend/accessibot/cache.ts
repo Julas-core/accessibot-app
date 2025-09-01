@@ -10,6 +10,19 @@ export interface CachedFix {
   createdAt: Date;
 }
 
+export interface CacheConfig {
+  defaultTtlDays: number;
+  cleanupIntervalDays: number;
+  deepCleanupIntervalDays: number;
+}
+
+// Default cache configuration
+export const defaultCacheConfig: CacheConfig = {
+  defaultTtlDays: 7,        // Cache entries are valid for 7 days
+  cleanupIntervalDays: 30,  // Regular cleanup removes entries older than 30 days
+  deepCleanupIntervalDays: 7, // Deep cleanup removes entries older than 7 days
+};
+
 // Generate a hash for an issue to use as cache key
 export function generateIssueHash(issue: {
   type: string;
@@ -38,22 +51,100 @@ export async function cacheFix(issueHash: string, fixedCodeSnippet: string): Pro
   `;
 }
 
-// Retrieve cached fix
-export async function getCachedFix(issueHash: string): Promise<string | null> {
+// Retrieve cached fix with configurable TTL
+export async function getCachedFix(issueHash: string, config: CacheConfig = defaultCacheConfig): Promise<string | null> {
+  const cutoffDate = new Date(Date.now() - config.defaultTtlDays * 24 * 60 * 60 * 1000);
+  
   const result = await cacheDB.queryRow<{ fixed_code_snippet: string }>`
     SELECT fixed_code_snippet
     FROM ai_fixes
     WHERE issue_hash = ${issueHash}
-      AND created_at > ${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)} -- Cache for 7 days
+      AND created_at > ${cutoffDate}
   `;
   
   return result?.fixed_code_snippet || null;
 }
 
-// Clean up old cache entries
-export async function cleanupCache(): Promise<void> {
+// Clean up old cache entries with configurable interval
+export async function cleanupCache(config: CacheConfig = defaultCacheConfig): Promise<void> {
+  const cutoffDate = new Date(Date.now() - config.cleanupIntervalDays * 24 * 60 * 60 * 1000);
+  
+  const result = await cacheDB.queryRow<{ count: string }>`
+    SELECT COUNT(*) as count
+    FROM ai_fixes
+    WHERE created_at < ${cutoffDate}
+  `;
+  
+  const entriesToDelete = parseInt(result?.count || '0');
+  
   await cacheDB.exec`
     DELETE FROM ai_fixes
-    WHERE created_at < ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)} -- Remove entries older than 30 days
+    WHERE created_at < ${cutoffDate}
   `;
+  
+  console.log(`Cache cleanup completed: removed ${entriesToDelete} entries older than ${config.cleanupIntervalDays} days`);
+}
+
+// Get cache statistics
+export async function getCacheStats(): Promise<{
+  totalEntries: number;
+  entriesLast24h: number;
+  entriesLast7d: number;
+  oldestEntry: Date | null;
+  newestEntry: Date | null;
+}> {
+  const now = new Date();
+  const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const totalResult = await cacheDB.queryRow<{ count: string }>`
+    SELECT COUNT(*) as count FROM ai_fixes
+  `;
+
+  const recent24hResult = await cacheDB.queryRow<{ count: string }>`
+    SELECT COUNT(*) as count FROM ai_fixes WHERE created_at > ${last24h}
+  `;
+
+  const recent7dResult = await cacheDB.queryRow<{ count: string }>`
+    SELECT COUNT(*) as count FROM ai_fixes WHERE created_at > ${last7d}
+  `;
+
+  const dateRangeResult = await cacheDB.queryRow<{ 
+    oldest: Date | null; 
+    newest: Date | null;
+  }>`
+    SELECT 
+      MIN(created_at) as oldest,
+      MAX(created_at) as newest
+    FROM ai_fixes
+  `;
+
+  return {
+    totalEntries: parseInt(totalResult?.count || '0'),
+    entriesLast24h: parseInt(recent24hResult?.count || '0'),
+    entriesLast7d: parseInt(recent7dResult?.count || '0'),
+    oldestEntry: dateRangeResult?.oldest || null,
+    newestEntry: dateRangeResult?.newest || null,
+  };
+}
+
+// Custom cleanup with configurable interval (used by cron jobs)
+export async function cleanupCacheCustom(intervalDays: number): Promise<number> {
+  const cutoffDate = new Date(Date.now() - intervalDays * 24 * 60 * 60 * 1000);
+  
+  const result = await cacheDB.queryRow<{ count: string }>`
+    SELECT COUNT(*) as count
+    FROM ai_fixes
+    WHERE created_at < ${cutoffDate}
+  `;
+  
+  const entriesToDelete = parseInt(result?.count || '0');
+  
+  await cacheDB.exec`
+    DELETE FROM ai_fixes
+    WHERE created_at < ${cutoffDate}
+  `;
+  
+  console.log(`Custom cache cleanup completed: removed ${entriesToDelete} entries older than ${intervalDays} days`);
+  return entriesToDelete;
 }

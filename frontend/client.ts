@@ -84,7 +84,10 @@ export interface ClientOptions {
  */
 import { analyze as api_accessibot_analyze_analyze } from "~backend/accessibot/analyze";
 import { batchProcessorStatus as api_accessibot_batch_stats_batchProcessorStatus } from "~backend/accessibot/batch-stats";
-import { cleanupCacheEndpoint as api_accessibot_cleanup_cleanupCacheEndpoint } from "~backend/accessibot/cleanup";
+import {
+    cleanupCacheEndpoint as api_accessibot_cleanup_cleanupCacheEndpoint,
+    getCacheStatsEndpoint as api_accessibot_cleanup_getCacheStatsEndpoint
+} from "~backend/accessibot/cleanup";
 import {
     createPullRequest as api_accessibot_github_createPullRequest,
     listRepositories as api_accessibot_github_listRepositories
@@ -101,6 +104,7 @@ export namespace accessibot {
             this.batchProcessorStatus = this.batchProcessorStatus.bind(this)
             this.cleanupCacheEndpoint = this.cleanupCacheEndpoint.bind(this)
             this.createPullRequest = this.createPullRequest.bind(this)
+            this.getCacheStatsEndpoint = this.getCacheStatsEndpoint.bind(this)
             this.listRepositories = this.listRepositories.bind(this)
         }
 
@@ -125,9 +129,9 @@ export namespace accessibot {
         /**
          * Cleanup old cache entries - can be called manually or via cron job
          */
-        public async cleanupCacheEndpoint(): Promise<ResponseType<typeof api_accessibot_cleanup_cleanupCacheEndpoint>> {
+        public async cleanupCacheEndpoint(params: RequestType<typeof api_accessibot_cleanup_cleanupCacheEndpoint>): Promise<ResponseType<typeof api_accessibot_cleanup_cleanupCacheEndpoint>> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/cleanup/cache`, {method: "POST", body: undefined})
+            const resp = await this.baseClient.callTypedAPI(`/cleanup/cache`, {method: "POST", body: JSON.stringify(params)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_cleanup_cleanupCacheEndpoint>
         }
 
@@ -138,6 +142,15 @@ export namespace accessibot {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/github/pull-request`, {method: "POST", body: JSON.stringify(params)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_github_createPullRequest>
+        }
+
+        /**
+         * Get cache statistics and configuration
+         */
+        public async getCacheStatsEndpoint(): Promise<ResponseType<typeof api_accessibot_cleanup_getCacheStatsEndpoint>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/cache/stats`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_cleanup_getCacheStatsEndpoint>
         }
 
         /**
