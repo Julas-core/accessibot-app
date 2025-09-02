@@ -88,6 +88,7 @@ import {
     cleanupCacheEndpoint as api_accessibot_cleanup_cleanupCacheEndpoint,
     getCacheStatsEndpoint as api_accessibot_cleanup_getCacheStatsEndpoint
 } from "~backend/accessibot/cleanup";
+import { demoMode as api_accessibot_demo_demoMode } from "~backend/accessibot/demo";
 import {
     createPullRequest as api_accessibot_github_createPullRequest,
     listRepositories as api_accessibot_github_listRepositories
@@ -104,6 +105,7 @@ export namespace accessibot {
             this.batchProcessorStatus = this.batchProcessorStatus.bind(this)
             this.cleanupCacheEndpoint = this.cleanupCacheEndpoint.bind(this)
             this.createPullRequest = this.createPullRequest.bind(this)
+            this.demoMode = this.demoMode.bind(this)
             this.getCacheStatsEndpoint = this.getCacheStatsEndpoint.bind(this)
             this.listRepositories = this.listRepositories.bind(this)
         }
@@ -142,6 +144,15 @@ export namespace accessibot {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/github/pull-request`, {method: "POST", body: JSON.stringify(params)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_github_createPullRequest>
+        }
+
+        /**
+         * Returns whether the app is running in demo mode for OpenAI and GitHub.
+         */
+        public async demoMode(): Promise<ResponseType<typeof api_accessibot_demo_demoMode>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/demo-mode`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_demo_demoMode>
         }
 
         /**
