@@ -94,6 +94,11 @@ import {
     listRepositories as api_accessibot_github_listRepositories
 } from "~backend/accessibot/github";
 import {
+    getProviderStatsEndpoint as api_accessibot_provider_management_getProviderStatsEndpoint,
+    refreshProvidersEndpoint as api_accessibot_provider_management_refreshProvidersEndpoint,
+    resetProvidersEndpoint as api_accessibot_provider_management_resetProvidersEndpoint
+} from "~backend/accessibot/provider-management";
+import {
     genericWebhook as api_accessibot_webhook_genericWebhook,
     githubWebhook as api_accessibot_webhook_githubWebhook
 } from "~backend/accessibot/webhook";
@@ -123,6 +128,7 @@ export namespace accessibot {
             this.demoMode = this.demoMode.bind(this)
             this.genericWebhook = this.genericWebhook.bind(this)
             this.getCacheStatsEndpoint = this.getCacheStatsEndpoint.bind(this)
+            this.getProviderStatsEndpoint = this.getProviderStatsEndpoint.bind(this)
             this.getWebhookAnalyses = this.getWebhookAnalyses.bind(this)
             this.getWebhookAnalysis = this.getWebhookAnalysis.bind(this)
             this.getWebhookAnalytics = this.getWebhookAnalytics.bind(this)
@@ -131,6 +137,8 @@ export namespace accessibot {
             this.getWebhookStats = this.getWebhookStats.bind(this)
             this.githubWebhook = this.githubWebhook.bind(this)
             this.listRepositories = this.listRepositories.bind(this)
+            this.refreshProvidersEndpoint = this.refreshProvidersEndpoint.bind(this)
+            this.resetProvidersEndpoint = this.resetProvidersEndpoint.bind(this)
             this.retryWebhookAnalysis = this.retryWebhookAnalysis.bind(this)
         }
 
@@ -171,7 +179,7 @@ export namespace accessibot {
         }
 
         /**
-         * Returns whether the app is running in demo mode for OpenAI and GitHub.
+         * Returns whether the app is running in demo mode for AI and GitHub, and lists available providers.
          */
         public async demoMode(): Promise<ResponseType<typeof api_accessibot_demo_demoMode>> {
             // Now make the actual call to the API
@@ -195,6 +203,15 @@ export namespace accessibot {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/cache/stats`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_cleanup_getCacheStatsEndpoint>
+        }
+
+        /**
+         * Get comprehensive provider statistics
+         */
+        public async getProviderStatsEndpoint(): Promise<ResponseType<typeof api_accessibot_provider_management_getProviderStatsEndpoint>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/providers/stats`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_provider_management_getProviderStatsEndpoint>
         }
 
         /**
@@ -282,6 +299,24 @@ export namespace accessibot {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/github/repositories`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_github_listRepositories>
+        }
+
+        /**
+         * Refresh provider configuration (detect new API keys)
+         */
+        public async refreshProvidersEndpoint(): Promise<ResponseType<typeof api_accessibot_provider_management_refreshProvidersEndpoint>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/providers/refresh`, {method: "POST", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_provider_management_refreshProvidersEndpoint>
+        }
+
+        /**
+         * Reset provider availability (re-enable disabled providers)
+         */
+        public async resetProvidersEndpoint(): Promise<ResponseType<typeof api_accessibot_provider_management_resetProvidersEndpoint>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/providers/reset`, {method: "POST", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_provider_management_resetProvidersEndpoint>
         }
 
         /**

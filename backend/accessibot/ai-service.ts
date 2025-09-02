@@ -1,12 +1,12 @@
 import { secret } from "encore.dev/config";
-import { generateText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
 import { cacheFix, getCachedFix, generateIssueHash } from "./cache";
 import { openAIRateLimiter, BatchProcessor, BatchProcessorConfig } from "./rate-limiter";
+import { aiProviderManager } from "./ai-providers";
 import type { AccessibilityIssue } from "./analyze";
 
 const openAIKey = secret("OpenAIKey");
-const openai = createOpenAI({ apiKey: openAIKey() });
+const anthropicKey = secret("AnthropicKey");
+const googleKey = secret("GoogleKey");
 
 interface BatchAIRequest {
   issue: AccessibilityIssue;
@@ -16,15 +16,22 @@ interface BatchAIRequest {
 interface BatchAIResponse {
   issueHash: string;
   fixedCode: string;
+  provider?: string;
+  cost?: number;
 }
 
 const DEMO_FIX = "💡 Demo Suggestion: Add descriptive alt text or labels.";
 
-// Indicates whether the service is running in demo mode (no OpenAI key configured).
+// Indicates whether the service is running in demo mode (no AI providers configured).
 export function isDemoMode(): boolean {
   try {
-    const key = openAIKey();
-    return !key || key.trim() === "";
+    const openai = openAIKey();
+    const anthropic = anthropicKey();
+    const google = googleKey();
+    
+    return (!openai || openai.trim() === "") && 
+           (!anthropic || anthropic.trim() === "") && 
+           (!google || google.trim() === "");
   } catch {
     return true;
   }
@@ -59,7 +66,7 @@ export async function getAIFixForIssue(issue: AccessibilityIssue): Promise<strin
     return cachedFix;
   }
 
-  // Demo mode: return a mock suggestion without calling OpenAI
+  // Demo mode: return a mock suggestion without calling AI providers
   if (isDemoMode()) {
     console.log("Demo mode active - returning mock AI fix");
     const mock = DEMO_FIX;
@@ -67,18 +74,28 @@ export async function getAIFixForIssue(issue: AccessibilityIssue): Promise<strin
     return mock;
   }
 
-  // Check rate limit
+  // Check if any AI providers are available
+  if (!aiProviderManager.hasAvailableProviders()) {
+    console.warn("No AI providers available");
+    const mock = DEMO_FIX;
+    await cacheFix(issueHash, mock);
+    return mock;
+  }
+
+  // Check rate limit (keeping for backward compatibility)
   const rateLimitResult = await openAIRateLimiter.checkLimit();
   if (!rateLimitResult.allowed) {
-    console.warn(`Rate limit exceeded for OpenAI API. Reset time: ${rateLimitResult.resetTime}`);
+    console.warn(`Rate limit exceeded for AI API. Reset time: ${rateLimitResult.resetTime}`);
     return null;
   }
 
-  console.log(`OpenAI API requests remaining: ${rateLimitResult.remaining}`);
+  console.log(`AI API requests remaining: ${rateLimitResult.remaining}`);
 
   try {
-    // Determine priority based on severity
+    // Determine priority and complexity based on severity
     const priority = getPriorityFromSeverity(issue.severity);
+    const complexity = getComplexityFromIssue(issue);
+    
     // Add to batch processor with priority
     const result = await aiBatchProcessor.add(
       {
@@ -111,6 +128,21 @@ function getPriorityFromSeverity(severity: AccessibilityIssue["severity"]): numb
   }
 }
 
+function getComplexityFromIssue(issue: AccessibilityIssue): "simple" | "medium" | "complex" {
+  // Simple issues: missing alt text, labels
+  if (issue.type.includes("alt") || issue.type.includes("label")) {
+    return "simple";
+  }
+  
+  // Complex issues: heading hierarchy, form structure
+  if (issue.type.includes("hierarchy") || issue.type.includes("form") || issue.type.includes("structure")) {
+    return "complex";
+  }
+  
+  // Everything else is medium complexity
+  return "medium";
+}
+
 async function processBatchAIRequests(requests: BatchAIRequest[]): Promise<BatchAIResponse[]> {
   if (requests.length === 0) {
     return [];
@@ -122,6 +154,18 @@ async function processBatchAIRequests(requests: BatchAIRequest[]): Promise<Batch
     return requests.map((r) => ({
       issueHash: r.issueHash,
       fixedCode: DEMO_FIX,
+      provider: "Demo",
+      cost: 0,
+    }));
+  }
+
+  if (!aiProviderManager.hasAvailableProviders()) {
+    console.log("No AI providers available - returning mock batch AI fixes");
+    return requests.map((r) => ({
+      issueHash: r.issueHash,
+      fixedCode: DEMO_FIX,
+      provider: "Demo",
+      cost: 0,
     }));
   }
 
@@ -134,16 +178,28 @@ async function processBatchAIRequests(requests: BatchAIRequest[]): Promise<Batch
 
   // Create a combined prompt for all issues in the batch
   const batchPrompt = createBatchPrompt(requests.map((r) => r.issue));
+  
+  // Estimate tokens and determine complexity
+  const estimatedTokens = Math.ceil(batchPrompt.length / 4) + (200 * requests.length); // Input + estimated output
+  const maxComplexity = requests.reduce((max, r) => {
+    const complexity = getComplexityFromIssue(r.issue);
+    if (complexity === "complex") return "complex";
+    if (complexity === "medium" && max !== "complex") return "medium";
+    return max;
+  }, "simple" as "simple" | "medium" | "complex");
 
   try {
-    const response = await generateText({
-      model: openai("gpt-4"),
-      prompt: batchPrompt,
-      maxTokens: 1000 * requests.length, // Scale tokens with batch size
-    });
+    const result = await aiProviderManager.executeWithFallback(
+      "batch",
+      batchPrompt,
+      200 * requests.length, // Max tokens for output
+      maxComplexity
+    );
+
+    console.log(`Batch AI request completed with ${result.provider} (cost: $${result.cost.toFixed(6)})`);
 
     // Parse the batch response
-    const fixes = parseBatchResponse(response.text, requests);
+    const fixes = parseBatchResponse(result.text, requests, result.provider, result.cost);
 
     return fixes;
   } catch (error) {
@@ -190,8 +246,14 @@ Provide the corrected HTML for each issue in the format specified above.`;
   return prompt;
 }
 
-function parseBatchResponse(response: string, requests: BatchAIRequest[]): BatchAIResponse[] {
+function parseBatchResponse(
+  response: string, 
+  requests: BatchAIRequest[], 
+  provider: string, 
+  totalCost: number
+): BatchAIResponse[] {
   const results: BatchAIResponse[] = [];
+  const costPerRequest = totalCost / requests.length;
 
   try {
     // Split response by ISSUE_ markers
@@ -203,12 +265,16 @@ function parseBatchResponse(response: string, requests: BatchAIRequest[]): Batch
         results.push({
           issueHash: requests[i].issueHash,
           fixedCode,
+          provider,
+          cost: costPerRequest,
         });
       } else {
         // Fallback to original code snippet if AI didn't provide a fix
         results.push({
           issueHash: requests[i].issueHash,
           fixedCode: requests[i].issue.codeSnippet,
+          provider,
+          cost: costPerRequest,
         });
       }
     }
@@ -218,6 +284,8 @@ function parseBatchResponse(response: string, requests: BatchAIRequest[]): Batch
       results.push({
         issueHash: requests[i].issueHash,
         fixedCode: requests[i].issue.codeSnippet,
+        provider,
+        cost: costPerRequest,
       });
     }
   } catch (error) {
@@ -227,6 +295,8 @@ function parseBatchResponse(response: string, requests: BatchAIRequest[]): Batch
     return requests.map((req) => ({
       issueHash: req.issueHash,
       fixedCode: req.issue.codeSnippet,
+      provider,
+      cost: costPerRequest,
     }));
   }
 
@@ -237,11 +307,13 @@ async function fallbackIndividualRequests(requests: BatchAIRequest[]): Promise<B
   console.log("Falling back to individual AI requests");
 
   // Demo mode: return mock fixes quickly
-  if (isDemoMode()) {
-    console.log("Demo mode active - returning mock individual AI fixes");
+  if (isDemoMode() || !aiProviderManager.hasAvailableProviders()) {
+    console.log("Demo mode or no providers - returning mock individual AI fixes");
     return requests.map((r) => ({
       issueHash: r.issueHash,
       fixedCode: DEMO_FIX,
+      provider: "Demo",
+      cost: 0,
     }));
   }
 
@@ -259,28 +331,38 @@ async function fallbackIndividualRequests(requests: BatchAIRequest[]): Promise<B
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
-      const response = await generateText({
-        model: openai("gpt-4"),
-        prompt: `You are an accessibility expert. For the following accessibility issue, provide a specific, improved code snippet that fixes the problem:
+      const prompt = `You are an accessibility expert. For the following accessibility issue, provide a specific, improved code snippet that fixes the problem:
 
 Issue Type: ${request.issue.type}
 Severity: ${request.issue.severity.toUpperCase()}
 Description: ${request.issue.description}
 Current Element: ${request.issue.element}
 
-Provide only the corrected HTML code snippet, no explanations.`,
-        maxTokens: 200,
-      });
+Provide only the corrected HTML code snippet, no explanations.`;
+
+      const complexity = getComplexityFromIssue(request.issue);
+      const estimatedTokens = Math.ceil(prompt.length / 4) + 200;
+
+      const result = await aiProviderManager.executeWithFallback(
+        "individual",
+        prompt,
+        200,
+        complexity
+      );
 
       results.push({
         issueHash: request.issueHash,
-        fixedCode: response.text.trim() || request.issue.codeSnippet,
+        fixedCode: result.text.trim() || request.issue.codeSnippet,
+        provider: result.provider,
+        cost: result.cost,
       });
     } catch (error) {
       console.error(`Individual AI request failed for ${request.issue.type}:`, error);
       results.push({
         issueHash: request.issueHash,
         fixedCode: request.issue.codeSnippet,
+        provider: "Fallback",
+        cost: 0,
       });
     }
   }
@@ -288,11 +370,11 @@ Provide only the corrected HTML code snippet, no explanations.`,
   return results;
 }
 
-// Enhanced AI fix with better error handling and retries
+// Enhanced AI fix with better error handling and multi-provider support
 export async function enhanceIssuesWithAI(issues: AccessibilityIssue[]): Promise<void> {
   if (issues.length === 0) return;
 
-  console.log(`Enhancing ${issues.length} issues with AI fixes using priority processing`);
+  console.log(`Enhancing ${issues.length} issues with AI fixes using multi-provider processing`);
 
   // Demo mode: set mock suggestions and return
   if (isDemoMode()) {
@@ -303,11 +385,17 @@ export async function enhanceIssuesWithAI(issues: AccessibilityIssue[]): Promise
     return;
   }
 
-  const apiKey = openAIKey();
-  if (!apiKey || apiKey.trim() === "") {
-    console.warn("OpenAI API key not configured, skipping AI enhancements");
+  if (!aiProviderManager.hasAvailableProviders()) {
+    console.warn("No AI providers configured or available, using demo mode");
+    for (const issue of issues) {
+      issue.codeSnippet = DEMO_FIX;
+    }
     return;
   }
+
+  // Log provider stats
+  const providerStats = aiProviderManager.getProviderStats();
+  console.log("Available AI providers:", providerStats.filter(p => p.isAvailable).map(p => p.name));
 
   // Log batch processor stats
   const stats = aiBatchProcessor.getStats();
@@ -338,7 +426,9 @@ export async function enhanceIssuesWithAI(issues: AccessibilityIssue[]): Promise
 
   // Log final stats after processing
   const finalStats = aiBatchProcessor.getStats();
+  const finalProviderStats = aiProviderManager.getProviderStats();
   console.log("AI enhancement completed. Final batch processor stats:", finalStats);
+  console.log("Final provider stats:", finalProviderStats);
 }
 
 // Export batch processor stats for monitoring
@@ -347,5 +437,19 @@ export function getBatchProcessorStats() {
     stats: aiBatchProcessor.getStats(),
     pendingCount: aiBatchProcessor.getPendingCount(),
     queueSummary: aiBatchProcessor.getQueueSummary(),
+    providerStats: aiProviderManager.getProviderStats(),
   };
+}
+
+// Export provider management functions
+export function getProviderStats() {
+  return aiProviderManager.getProviderStats();
+}
+
+export function resetProviderAvailability() {
+  aiProviderManager.resetProviderAvailability();
+}
+
+export function refreshProviders() {
+  aiProviderManager.refreshProviders();
 }

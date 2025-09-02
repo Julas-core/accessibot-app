@@ -11,6 +11,14 @@ export interface BatchProcessorInfo {
   };
   pendingCount: number;
   queueSummary: { [priority: number]: number };
+  providerStats: Array<{
+    name: string;
+    isAvailable: boolean;
+    successRate: number;
+    totalRequests: number;
+    totalCost: number;
+    costPerToken: number;
+  }>;
 }
 
 // Get current batch processor statistics and queue status

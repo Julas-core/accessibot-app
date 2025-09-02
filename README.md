@@ -1,16 +1,19 @@
 # AccessiBot
 
-AI-powered web accessibility analysis with intelligent caching, dynamic batch processing, webhook CI/CD integration, and optional GitHub PR automation — built on Encore.ts with a modern React frontend.
+AI-powered web accessibility analysis with intelligent caching, dynamic batch processing, webhook CI/CD integration, multi-provider AI support with automatic fallback and cost optimization — built on Encore.ts with a modern React frontend.
 
 ## Key Features
 
 - Automated accessibility analysis for HTML content (URL or raw HTML)
-- AI-enhanced code fixes (OpenAI) with robust DB-backed caching and demo mode
+- **Multi-Provider AI Enhancement** with OpenAI, Anthropic, and Google support
+- **Automatic Provider Fallback** and cost optimization by selecting the most cost-effective provider
+- Robust DB-backed caching with TTL and demo mode support
 - Dynamic, priority-aware batch processing with adaptive sizing and rate-limiting
 - Webhook ingestion (GitHub + generic) driving async analysis via Pub/Sub
 - GitHub integration for automated PR creation with fixed content (demo-safe)
 - Scheduled cache cleanup via Cron jobs (daily + weekly deep clean)
 - Real-time analytics and monitoring dashboard (delivery, trends, performance)
+- Provider management with stats, reset, and refresh capabilities
 - Friendly UI (React, Tailwind v4, shadcn/ui, TanStack Query, lucide-react)
 
 ## Project Structure
@@ -19,7 +22,8 @@ AI-powered web accessibility analysis with intelligent caching, dynamic batch pr
   - accessibot/
     - encore.service.ts
     - analyze.ts
-    - ai-service.ts
+    - **ai-providers.ts** (NEW: Multi-provider AI management)
+    - ai-service.ts (Enhanced with multi-provider support)
     - cache.ts
     - cache-migrations/
       - 1_create_cache_table.up.sql
@@ -36,12 +40,14 @@ AI-powered web accessibility analysis with intelligent caching, dynamic batch pr
     - github.ts
     - cleanup.ts
     - cron-cleanup.ts
-    - demo.ts
+    - demo.ts (Enhanced with provider info)
+    - batch-stats.ts (Enhanced with provider stats)
+    - **provider-management.ts** (NEW: Provider management endpoints)
 - frontend/
   - App.tsx
   - components/
     - AccessibilityAnalyzer.tsx
-    - CacheStatus.tsx
+    - CacheStatus.tsx (Enhanced with provider management)
     - GitHubIntegration.tsx
     - WebhookStatus.tsx
     - WebhookAnalyticsDashboard.tsx
@@ -75,13 +81,42 @@ Service: accessibot
   - weekly-cache-cleanup (Sunday 1:00 AM UTC) → deep cleanup
 
 - Secrets (configured via Infrastructure tab)
-  - OpenAIKey: optional; enables AI fixes; when missing, demo suggestions are used
+  - **OpenAIKey**: optional; enables OpenAI GPT-4 and GPT-4o-mini models
+  - **AnthropicKey**: optional; enables Claude 3.5 Sonnet and Haiku models
+  - **GoogleKey**: optional; enables Gemini 1.5 Pro and Flash models
   - GitHubToken: optional; enables real PR creation; when missing, PR flow is simulated
   - WebhookSecret: optional; GitHub signature verification; if missing, validation is bypassed (demo-friendly)
 
+### Multi-Provider AI System
+
+The system now supports multiple AI providers with intelligent selection and fallback:
+
+**Supported Providers:**
+- **OpenAI**: GPT-4o ($15/1M tokens), GPT-4o-mini ($1.5/1M tokens)
+- **Anthropic**: Claude 3.5 Sonnet ($15/1M tokens), Claude 3.5 Haiku ($1/1M tokens)  
+- **Google**: Gemini 1.5 Pro ($3.5/1M tokens), Gemini 1.5 Flash ($0.375/1M tokens)
+
+**Cost Optimization:**
+- Automatically selects the most cost-effective provider for each request
+- Considers task complexity (simple/medium/complex) when choosing models
+- Tracks provider performance and costs for optimization
+- Prefers cheaper models for simple tasks (alt text, labels)
+- Uses more capable models for complex tasks (hierarchy, structure)
+
+**Automatic Fallback:**
+- Tries up to 3 providers per request if one fails
+- Temporarily disables providers with high failure rates
+- Auto-recovery after 5 minutes for disabled providers
+- Graceful degradation to demo mode if all providers fail
+
+**Provider Management:**
+- Real-time statistics for each provider (success rate, cost, requests)
+- Manual provider reset and configuration refresh
+- Provider availability monitoring and management
+
 ### Demo Mode Behavior
 
-- AI: If OpenAIKey is not provided, AI responses are replaced with mock suggestions and results are still cached.
+- AI: If no AI provider keys are configured, AI responses are replaced with mock suggestions and results are still cached.
 - GitHub: If GitHubToken is not provided, repository list and PR creation are simulated.
 
 ## API Endpoints
@@ -95,9 +130,17 @@ Public (expose: true) endpoints:
     - Body: { url?: string; html?: string }
     - Returns: { issues: AccessibilityIssue[]; summary: { total, high, medium, low } }
   - GET /batch-processor/status
-    - Returns current batch stats and priority queue summary
+    - Returns current batch stats, priority queue summary, and provider statistics
   - GET /demo-mode
-    - Returns flags for demo mode (AI/GitHub)
+    - Returns flags for demo mode (AI/GitHub) and list of available providers
+
+- **Provider Management** (NEW)
+  - GET /providers/stats
+    - Returns comprehensive provider statistics and costs
+  - POST /providers/reset
+    - Re-enables all disabled providers
+  - POST /providers/refresh
+    - Refreshes provider configuration to detect new API keys
 
 - Cache management and stats
   - POST /cleanup/cache
@@ -132,7 +175,7 @@ Public (expose: true) endpoints:
     - Query: startDate, endDate, repository
     - Returns delivery analytics, repo stats, issue trends, fix analytics, processing times
   - GET /webhook/performance
-    - Real-time metrics snapshot (current hour, last 24h, today’s success rate, etc.)
+    - Real-time metrics snapshot (current hour, last 24h, today's success rate, etc.)
 
 - GitHub integration
   - GET /github/repositories
@@ -143,11 +186,14 @@ Public (expose: true) endpoints:
 
 ## AI, Caching, and Rate Limiting
 
-- AI Service
-  - Uses @ai-sdk/openai (generateText) when OpenAIKey is available
-  - Batch processing with dynamic batch size and delay to target response time and limit error rates
+- **Multi-Provider AI Service**
+  - Supports OpenAI, Anthropic, and Google AI providers
+  - Automatic cost optimization by selecting the cheapest suitable provider
+  - Task complexity analysis (simple/medium/complex) for model selection
+  - Automatic fallback between providers on failures
+  - Provider performance tracking and temporary disabling of unreliable providers
+  - Batch processing with dynamic batch size and delay to target response time
   - Priority queuing (high/medium/low severity → higher priority)
-  - Fallback to individual requests on batch failure
   - Robust parsing and error handling for AI responses
 
 - Cache
@@ -158,7 +204,7 @@ Public (expose: true) endpoints:
 
 - Rate Limiter
   - Sliding window using DB table rate_limit_requests
-  - Default: 50 requests/hour for OpenAI usage
+  - Default: 50 requests/hour for AI usage (applied to all providers)
   - Prevents exceeding configured budget; exposes reset and remaining
 
 ## Webhook Processing Pipeline
@@ -169,7 +215,7 @@ Public (expose: true) endpoints:
 4. Subscription handler:
    - Persists initial analysis record (processing)
    - Generates demo HTML (for demo purposes) and runs analyzeHTML
-   - Optional AI enhancement of issues
+   - Multi-provider AI enhancement of issues with cost optimization
    - Optionally creates a PR when high-severity issues exist
    - Updates analysis record (completed/failed) with counts and PR URL
 
@@ -179,9 +225,16 @@ Note: In this demo, file contents are simulated. Integrating real repository fil
 
 - AccessibilityAnalyzer
   - URL/HTML analysis
-  - Displays issues and AI-enhanced fixes
+  - Displays issues and AI-enhanced fixes with provider information
   - GitHub PR creation UI
   - Cache status and batch processor stats
+
+- CacheStatus (Enhanced)
+  - Multi-provider AI statistics with cost tracking
+  - Provider management (reset/refresh)
+  - Individual provider performance metrics
+  - Cache statistics and cleanup controls
+  - Batch processor monitoring
 
 - WebhookStatus
   - Overview metrics, recent analyses with filters and retry
@@ -197,17 +250,36 @@ Note: In this demo, file contents are simulated. Integrating real repository fil
 
 Configure secrets in the Infrastructure tab:
 
-- OpenAIKey
-  - Enables AI-enhanced fixes; otherwise demo suggestions are used
+- **AI Providers** (at least one required for AI features):
+  - OpenAIKey: Enables OpenAI GPT-4o and GPT-4o-mini models
+  - AnthropicKey: Enables Claude 3.5 Sonnet and Haiku models
+  - GoogleKey: Enables Gemini 1.5 Pro and Flash models
 - GitHubToken
   - Enables real repository listing and PR creation; otherwise simulated
 - WebhookSecret
   - Enables GitHub webhook signature validation (X-Hub-Signature-256)
 
-If secrets are not set, the system gracefully falls back to demo mode.
+If no AI provider secrets are set, the system gracefully falls back to demo mode.
+
+## Cost Optimization Features
+
+- **Provider Selection Algorithm**: Automatically chooses the most cost-effective provider based on:
+  - Task complexity (simple tasks use cheaper models)
+  - Provider reliability (success rate tracking)
+  - Current provider availability
+  - Token requirements vs. provider limits
+
+- **Cost Tracking**: Real-time cost monitoring per provider with total spend visibility
+
+- **Intelligent Fallback**: Falls back to cheaper providers when premium providers fail
+
+- **Performance-Based Selection**: Temporarily disables unreliable providers to avoid wasted costs
 
 ## Extensibility Notes
 
+- Additional AI providers can be easily added to ai-providers.ts
+- Cost optimization algorithms can be tuned based on usage patterns
+- Provider-specific features (like function calling) can be added per provider
 - Real repository file fetching in webhook-processor.ts can be added using provider APIs
 - Authentication is intentionally omitted; add it only if needed
 - Additional issue detectors can be added to analyzeHTML
@@ -218,13 +290,15 @@ If secrets are not set, the system gracefully falls back to demo mode.
 - Webhook processor uses sample HTML (demo) instead of live repo content
 - No authentication by default (by design)
 - AI output is best-effort; always validate changes before merging
+- Provider rate limits are managed globally, not per-provider
 
 ## Types and Contracts
 
 The backend uses native TypeScript interfaces for request/response schemas, ensuring type safety in the frontend via ~backend imports. Examples:
 
 - AccessibilityIssue (analyze.ts)
-- BatchProcessorInfo (batch-stats.ts)
+- BatchProcessorInfo with provider stats (batch-stats.ts)
+- ProviderStatsResponse (provider-management.ts)
 - WebhookAnalysisResult (webhook-processor.ts)
 - GitHubRepo, CreatePullRequestRequest/Response (github.ts)
 - Webhook payload contracts (webhook.ts)
@@ -233,5 +307,6 @@ The backend uses native TypeScript interfaces for request/response schemas, ensu
 
 - GitHub webhook signature validation (HMAC-SHA256) when WebhookSecret is configured
 - Robust API error handling via Encore.ts APIError
-- No secrets in code; all secrets managed through the platform’s Infrastructure tab
-
+- No secrets in code; all secrets managed through the platform's Infrastructure tab
+- Provider isolation: failures in one provider don't affect others
+- Cost controls through rate limiting and provider management

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Database, RefreshCw, Trash2, CheckCircle, Zap, BarChart3, Timer, AlertCircle, Clock, Calendar, TrendingUp } from 'lucide-react';
+import { Loader2, Database, RefreshCw, Trash2, CheckCircle, Zap, BarChart3, Timer, AlertCircle, Clock, Calendar, TrendingUp, Brain, DollarSign } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import backend from '~backend/client';
 import { GlowCard } from './GlowCard';
@@ -25,6 +25,14 @@ export function CacheStatus() {
     queryKey: ['cache-stats'],
     queryFn: async () => {
       return await backend.accessibot.getCacheStatsEndpoint();
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const providerStatsQuery = useQuery({
+    queryKey: ['provider-stats'],
+    queryFn: async () => {
+      return await backend.accessibot.getProviderStatsEndpoint();
     },
     refetchInterval: 30000, // Refresh every 30 seconds
   });
@@ -66,6 +74,66 @@ export function CacheStatus() {
     },
   });
 
+  const resetProvidersMutation = useMutation({
+    mutationFn: async () => {
+      return await backend.accessibot.resetProvidersEndpoint();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Providers Reset",
+          description: data.message,
+        });
+        providerStatsQuery.refetch();
+        batchStatsQuery.refetch();
+      } else {
+        toast({
+          title: "Reset Failed",
+          description: data.message,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Provider reset error:', error);
+      toast({
+        title: "Reset Failed",
+        description: "Failed to reset providers. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const refreshProvidersMutation = useMutation({
+    mutationFn: async () => {
+      return await backend.accessibot.refreshProvidersEndpoint();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Providers Refreshed",
+          description: data.message,
+        });
+        providerStatsQuery.refetch();
+        batchStatsQuery.refetch();
+      } else {
+        toast({
+          title: "Refresh Failed",
+          description: data.message,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Provider refresh error:', error);
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh providers. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCleanupCache = () => {
     cleanupMutation.mutate();
   };
@@ -92,9 +160,9 @@ export function CacheStatus() {
   };
 
   const getResponseTimeColor = (responseTime: number) => {
-    if (responseTime < 10000) return 'text-green-600'; // &lt; 10s
-    if (responseTime < 20000) return 'text-yellow-600'; // &lt; 20s
-    return 'text-red-600'; // &gt;= 20s
+    if (responseTime < 10000) return 'text-green-600'; // < 10s
+    if (responseTime < 20000) return 'text-yellow-600'; // < 20s
+    return 'text-red-600'; // >= 20s
   };
 
   const formatDate = (date: Date | null) => {
@@ -102,21 +170,137 @@ export function CacheStatus() {
     return new Date(date).toLocaleDateString() + ' ' + new Date(date).toLocaleTimeString();
   };
 
+  const formatCurrency = (amount: number) => {
+    if (amount === 0) return '$0.00';
+    if (amount < 0.01) return `$${amount.toFixed(6)}`;
+    return `$${amount.toFixed(2)}`;
+  };
+
   return (
     <GlowCard wrapperClassName="mb-6 border-dashed">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Database className="w-5 h-5" />
-          System Performance Status
+          Multi-Provider AI System Status
         </CardTitle>
         <CardDescription>
-          AI processing with intelligent caching, automated cleanup, dynamic batch sizing, and priority queuing
+          Intelligent caching, dynamic batch processing, and multi-provider AI with automatic fallback and cost optimization
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* AI Provider Statistics */}
+        {providerStatsQuery.data && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Brain className="w-4 h-4 text-purple-500" />
+              <span className="font-medium text-sm">AI Provider Statistics</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => providerStatsQuery.refetch()}
+                disabled={providerStatsQuery.isRefetching}
+              >
+                {providerStatsQuery.isRefetching ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3 h-3" />
+                )}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="flex flex-col">
+                <span className="text-muted-foreground">Total Cost</span>
+                <span className="font-medium text-green-600">
+                  {formatCurrency(providerStatsQuery.data.totalCost)}
+                </span>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-muted-foreground">Total Requests</span>
+                <span className="font-medium text-blue-600">
+                  {providerStatsQuery.data.totalRequests}
+                </span>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-muted-foreground">Success Rate</span>
+                <span className="font-medium text-purple-600">
+                  {(providerStatsQuery.data.overallSuccessRate * 100).toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-muted-foreground">Active Providers</span>
+                <span className="font-medium text-orange-600">
+                  {providerStatsQuery.data.providers.filter(p => p.isAvailable).length}
+                </span>
+              </div>
+            </div>
+
+            {/* Individual Provider Stats */}
+            <div className="space-y-2">
+              <span className="text-sm font-medium">Provider Details:</span>
+              <div className="grid gap-2">
+                {providerStatsQuery.data.providers.map((provider) => (
+                  <div key={provider.name} className="flex items-center justify-between p-2 border rounded text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{provider.name}</span>
+                      {provider.isAvailable ? (
+                        <Badge variant="outline" className="text-green-700 border-green-200 text-xs">
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-red-700 border-red-200 text-xs">
+                          Disabled
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span>{formatCurrency(provider.totalCost)}</span>
+                      <span>{provider.totalRequests} reqs</span>
+                      <span>{(provider.successRate * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Provider Management */}
+            <div className="flex flex-wrap gap-2 pt-2 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => resetProvidersMutation.mutate()}
+                disabled={resetProvidersMutation.isPending}
+              >
+                {resetProvidersMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                )}
+                Reset Providers
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refreshProvidersMutation.mutate()}
+                disabled={refreshProvidersMutation.isPending}
+              >
+                {refreshProvidersMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <Database className="w-3 h-3 mr-1" />
+                )}
+                Refresh Config
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Cache Statistics */}
         {cacheStatsQuery.data && (
-          <div className="space-y-4">
+          <div className="space-y-4 border-t pt-4">
             <div className="flex items-center gap-2 mb-3">
               <Database className="w-4 h-4 text-green-500" />
               <span className="font-medium text-sm">Cache Statistics</span>
@@ -372,11 +556,18 @@ export function CacheStatus() {
                   High Error Rate
                 </Badge>
               )}
+
+              {providerStatsQuery.data && providerStatsQuery.data.totalCost > 0 && (
+                <Badge variant="outline" className="text-green-700 border-green-200">
+                  <DollarSign className="w-3 h-3 mr-1" />
+                  Cost Optimized
+                </Badge>
+              )}
             </div>
           </div>
         )}
 
-        {(batchStatsQuery.isError || cacheStatsQuery.isError) && (
+        {(batchStatsQuery.isError || cacheStatsQuery.isError || providerStatsQuery.isError) && (
           <div className="text-sm text-muted-foreground">
             Failed to load system stats
           </div>
