@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,7 @@ import type { AnalyzeResponse, AccessibilityIssue } from '~backend/accessibot/an
 import { GitHubIntegration } from './GitHubIntegration';
 import { CacheStatus } from './CacheStatus';
 import { WebhookStatus } from './WebhookStatus';
+import { GlowCard } from './GlowCard';
 
 export function AccessibilityAnalyzer() {
   const [activeTab, setActiveTab] = useState<'analyze' | 'webhook'>('analyze');
@@ -92,12 +93,20 @@ export function AccessibilityAnalyzer() {
     }
   };
 
+  // Handlers to avoid inline union type assertions inside JSX attributes
+  const handleMainTabChange = (value: string) => {
+    setActiveTab(value as 'analyze' | 'webhook');
+  };
+  const handleInputTabChange = (value: string) => {
+    setInputType(value as 'url' | 'html');
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-foreground mb-4">AccessiBot</h1>
         <p className="text-xl text-muted-foreground mb-4">
-          AI-powered web accessibility analysis with intelligent caching & CI/CD integration
+          AI-powered web accessibility analysis with intelligent caching &amp; CI/CD integration
         </p>
         <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
@@ -119,7 +128,7 @@ export function AccessibilityAnalyzer() {
       <CacheStatus />
 
       {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'analyze' | 'webhook')} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleMainTabChange} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="analyze" className="flex items-center gap-2">
             <Code2 className="w-4 h-4" />
@@ -132,7 +141,7 @@ export function AccessibilityAnalyzer() {
         </TabsList>
 
         <TabsContent value="analyze" className="space-y-6">
-          <Card>
+          <GlowCard>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Code2 className="w-6 h-6" />
@@ -144,7 +153,7 @@ export function AccessibilityAnalyzer() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Tabs value={inputType} onValueChange={(value) => setInputType(value as 'url' | 'html')}>
+              <Tabs value={inputType} onValueChange={handleInputTabChange}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="url">URL</TabsTrigger>
                   <TabsTrigger value="html">HTML Code</TabsTrigger>
@@ -197,12 +206,12 @@ export function AccessibilityAnalyzer() {
                 )}
               </Button>
             </CardContent>
-          </Card>
+          </GlowCard>
 
           {analysisResult && (
             <div className="space-y-6">
               {/* Summary */}
-              <Card>
+              <GlowCard>
                 <CardHeader>
                   <CardTitle>Analysis Summary</CardTitle>
                 </CardHeader>
@@ -234,10 +243,10 @@ export function AccessibilityAnalyzer() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </GlowCard>
 
               {/* Issues List */}
-              <Card>
+              <GlowCard>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     Accessibility Issues
@@ -300,7 +309,7 @@ export function AccessibilityAnalyzer() {
                     )}
                   </div>
                 </CardContent>
-              </Card>
+              </GlowCard>
 
               {/* GitHub Integration */}
               {analysisResult.issues.length > 0 && (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -31,18 +31,16 @@ import {
   Line, 
   AreaChart, 
   Area, 
-  BarChart, 
+  BarChart as ReBarChart, 
   Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
   Legend, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
+  ResponsiveContainer
 } from 'recharts';
+import { GlowCard } from './GlowCard';
 
 export function WebhookAnalyticsDashboard() {
   const [dateRange, setDateRange] = useState({
@@ -94,8 +92,6 @@ export function WebhookAnalyticsDashboard() {
   const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleDateString();
   };
-
-  const COLORS = ['#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
 
   if (analyticsQuery.isLoading) {
     return (
@@ -151,7 +147,7 @@ export function WebhookAnalyticsDashboard() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <GlowCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="w-5 h-5" />
@@ -208,12 +204,12 @@ export function WebhookAnalyticsDashboard() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </GlowCard>
 
       {/* Real-time Performance Metrics */}
       {performance && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-          <Card>
+          <GlowCard>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-blue-500" />
@@ -224,9 +220,9 @@ export function WebhookAnalyticsDashboard() {
               </div>
               <div className="text-xs text-muted-foreground">analyses</div>
             </CardContent>
-          </Card>
+          </GlowCard>
 
-          <Card>
+          <GlowCard>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-green-500" />
@@ -237,9 +233,9 @@ export function WebhookAnalyticsDashboard() {
               </div>
               <div className="text-xs text-muted-foreground">analyses</div>
             </CardContent>
-          </Card>
+          </GlowCard>
 
-          <Card>
+          <GlowCard>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <Target className="w-4 h-4 text-purple-500" />
@@ -250,9 +246,9 @@ export function WebhookAnalyticsDashboard() {
               </div>
               <div className="text-xs text-muted-foreground">today</div>
             </CardContent>
-          </Card>
+          </GlowCard>
 
-          <Card>
+          <GlowCard>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 text-orange-500" />
@@ -263,9 +259,9 @@ export function WebhookAnalyticsDashboard() {
               </div>
               <div className="text-xs text-muted-foreground">today</div>
             </CardContent>
-          </Card>
+          </GlowCard>
 
-          <Card>
+          <GlowCard>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-red-500" />
@@ -278,9 +274,9 @@ export function WebhookAnalyticsDashboard() {
                 {performance.peakHourToday ? `${performance.peakHourToday.analysesCount} analyses` : 'today'}
               </div>
             </CardContent>
-          </Card>
+          </GlowCard>
 
-          <Card>
+          <GlowCard>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-indigo-500" />
@@ -294,13 +290,13 @@ export function WebhookAnalyticsDashboard() {
                 {performance.topActiveRepository ? `${performance.topActiveRepository.analysesCount} analyses` : 'today'}
               </div>
             </CardContent>
-          </Card>
+          </GlowCard>
         </div>
       )}
 
       {/* Main Analytics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <GlowCard>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -315,9 +311,9 @@ export function WebhookAnalyticsDashboard() {
               </Badge>
             </div>
           </CardContent>
-        </Card>
+        </GlowCard>
 
-        <Card>
+        <GlowCard>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -330,9 +326,9 @@ export function WebhookAnalyticsDashboard() {
               Per analysis completion
             </div>
           </CardContent>
-        </Card>
+        </GlowCard>
 
-        <Card>
+        <GlowCard>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -347,9 +343,9 @@ export function WebhookAnalyticsDashboard() {
               </Badge>
             </div>
           </CardContent>
-        </Card>
+        </GlowCard>
 
-        <Card>
+        <GlowCard>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -362,11 +358,11 @@ export function WebhookAnalyticsDashboard() {
               In selected period
             </div>
           </CardContent>
-        </Card>
+        </GlowCard>
       </div>
 
       {/* Issue Trends Chart */}
-      <Card>
+      <GlowCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
@@ -417,10 +413,10 @@ export function WebhookAnalyticsDashboard() {
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
-      </Card>
+      </GlowCard>
 
       {/* Processing Time Analysis */}
-      <Card>
+      <GlowCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
@@ -472,10 +468,10 @@ export function WebhookAnalyticsDashboard() {
             </LineChart>
           </ResponsiveContainer>
         </CardContent>
-      </Card>
+      </GlowCard>
 
       {/* Repository Performance */}
-      <Card>
+      <GlowCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5" />
@@ -532,11 +528,11 @@ export function WebhookAnalyticsDashboard() {
             )}
           </div>
         </CardContent>
-      </Card>
+      </GlowCard>
 
       {/* Automated Fix Success by Repository */}
       {data.automatedFixes.fixesByRepository.length > 0 && (
-        <Card>
+        <GlowCard>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <GitBranch className="w-5 h-5" />
@@ -548,7 +544,7 @@ export function WebhookAnalyticsDashboard() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.automatedFixes.fixesByRepository.slice(0, 10)}>
+              <ReBarChart data={data.automatedFixes.fixesByRepository.slice(0, 10)}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="repositoryFullName" 
@@ -569,10 +565,10 @@ export function WebhookAnalyticsDashboard() {
                 <Legend />
                 <Bar dataKey="totalFixes" fill="#3b82f6" name="Total Fixes" />
                 <Bar dataKey="successfulFixes" fill="#22c55e" name="Successful Fixes" />
-              </BarChart>
+              </ReBarChart>
             </ResponsiveContainer>
           </CardContent>
-        </Card>
+        </GlowCard>
       )}
     </div>
   );

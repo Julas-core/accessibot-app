@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -20,9 +20,7 @@ import {
   ExternalLink,
   Info,
   BarChart3,
-  TrendingUp,
   GitCommit,
-  Users,
   BookOpen,
   Activity
 } from 'lucide-react';
@@ -30,6 +28,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import backend from '~backend/client';
 import type { WebhookAnalysisResult } from '~backend/accessibot/webhook-status';
 import { WebhookAnalyticsDashboard } from './WebhookAnalyticsDashboard';
+import { GlowCard } from './GlowCard';
 
 export function WebhookStatus() {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'setup'>('overview');
@@ -149,7 +148,7 @@ export function WebhookStatus() {
 
         <TabsContent value="overview" className="space-y-6">
           {/* Statistics Overview */}
-          <Card>
+          <GlowCard>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5" />
@@ -244,10 +243,10 @@ export function WebhookStatus() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
+          </GlowCard>
 
           {/* Analysis Results */}
-          <Card>
+          <GlowCard>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Webhook className="w-5 h-5" />
@@ -309,7 +308,7 @@ export function WebhookStatus() {
                 </div>
               ) : analysesQuery.data && analysesQuery.data.analyses.length > 0 ? (
                 <div className="space-y-4">
-                  {analysesQuery.data.analyses.map((analysis) => (
+                  {analysesQuery.data.analyses.map((analysis: WebhookAnalysisResult) => (
                     <div key={analysis.id} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -376,7 +375,7 @@ export function WebhookStatus() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => window.open(analysis.pullRequestUrl, '_blank')}
+                              onClick={() => window.open(analysis.pullRequestUrl!, '_blank')}
                             >
                               <ExternalLink className="w-3 h-3 mr-1" />
                               View PR
@@ -454,7 +453,7 @@ export function WebhookStatus() {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </GlowCard>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
@@ -463,7 +462,7 @@ export function WebhookStatus() {
 
         <TabsContent value="setup" className="space-y-6">
           {/* Webhook Setup Documentation */}
-          <Card>
+          <GlowCard>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BookOpen className="w-5 h-5" />
@@ -486,7 +485,7 @@ export function WebhookStatus() {
                       POST {docsQuery.data.githubWebhook.url}
                     </div>
                     <div className="space-y-1">
-                      {docsQuery.data.setup.github.map((step, index) => (
+                      {docsQuery.data.setup.github.map((step: string, index: number) => (
                         <div key={index} className="text-sm text-muted-foreground">
                           {step}
                         </div>
@@ -504,7 +503,7 @@ export function WebhookStatus() {
                       POST {docsQuery.data.genericWebhook.url}
                     </div>
                     <div className="space-y-1">
-                      {docsQuery.data.setup.generic.map((step, index) => (
+                      {docsQuery.data.setup.generic.map((step: string, index: number) => (
                         <div key={index} className="text-sm text-muted-foreground">
                           {step}
                         </div>
@@ -522,7 +521,7 @@ export function WebhookStatus() {
                 </AlertDescription>
               </Alert>
             </CardContent>
-          </Card>
+          </GlowCard>
         </TabsContent>
       </Tabs>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +12,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import backend from '~backend/client';
 import type { AccessibilityIssue } from '~backend/accessibot/analyze';
 import type { GitHubRepo } from '~backend/accessibot/github';
+import { GlowCard } from './GlowCard';
 
 interface GitHubIntegrationProps {
   issues: AccessibilityIssue[];
@@ -117,16 +118,18 @@ export function GitHubIntegration({ issues }: GitHubIntegrationProps) {
     }
 
     const [repoOwner, repoName] = selectedRepo.split('/');
-    const issueDescriptions = issues.map(issue => issue.description);
+    const issueDescriptions = issues.map((issue) => issue.description);
 
     createPRMutation.mutate({
       repoOwner,
       repoName,
-      fixes: [{
-        fileName: fileName.trim(),
-        content: fixedHtml.trim(),
-        issues: issueDescriptions,
-      }],
+      fixes: [
+        {
+          fileName: fileName.trim(),
+          content: fixedHtml.trim(),
+          issues: issueDescriptions,
+        },
+      ],
       title: prTitle.trim() || 'Fix accessibility issues',
       description: prDescription.trim() || `This pull request fixes ${issues.length} accessibility issues found by AccessiBot.`,
     });
@@ -151,7 +154,7 @@ export function GitHubIntegration({ issues }: GitHubIntegrationProps) {
             <p>This content has been made more accessible based on the following fixes:</p>
             
             <!-- Example fixes based on common issues -->
-            <img src="logo.png" alt="Company logo featuring a blue mountain range" />
+            <img src="https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=1200&q=80&auto=format&fit=crop" alt="Team collaboration in a modern office" />
             
             <label for="email">Email Address:</label>
             <input type="email" id="email" name="email" required />
@@ -170,7 +173,7 @@ export function GitHubIntegration({ issues }: GitHubIntegrationProps) {
   };
 
   return (
-    <Card>
+    <GlowCard>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Github className="w-6 h-6" />
@@ -192,8 +195,8 @@ export function GitHubIntegration({ issues }: GitHubIntegrationProps) {
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="space-y-2">
-              <div>{repositoriesQuery.error.message}</div>
-              {repositoriesQuery.error.message.includes('token') && (
+              <div>{(repositoriesQuery.error as Error).message}</div>
+              {(repositoriesQuery.error as Error).message.includes('token') && (
                 <div className="flex items-center gap-2 text-sm">
                   <Settings className="w-4 h-4" />
                   <span>Go to the Infrastructure tab to configure your GitHub token</span>
@@ -221,7 +224,7 @@ export function GitHubIntegration({ issues }: GitHubIntegrationProps) {
                   <SelectValue placeholder="Choose a repository" />
                 </SelectTrigger>
                 <SelectContent>
-                  {repositoriesQuery.data.repositories.map((repo) => (
+                  {repositoriesQuery.data.repositories.map((repo: GitHubRepo) => (
                     <SelectItem key={repo.id} value={repo.full_name}>
                       <div className="flex items-center justify-between w-full">
                         <span>{repo.full_name}</span>
@@ -354,6 +357,6 @@ export function GitHubIntegration({ issues }: GitHubIntegrationProps) {
           </div>
         )}
       </CardContent>
-    </Card>
+    </GlowCard>
   );
 }

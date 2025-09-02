@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Database, RefreshCw, Trash2, CheckCircle, Zap, BarChart3, Timer, AlertCircle, Clock, Calendar, TrendingUp } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import backend from '~backend/client';
+import { GlowCard } from './GlowCard';
 
 export function CacheStatus() {
   const { toast } = useToast();
@@ -91,9 +92,9 @@ export function CacheStatus() {
   };
 
   const getResponseTimeColor = (responseTime: number) => {
-    if (responseTime < 10000) return 'text-green-600'; // < 10s
-    if (responseTime < 20000) return 'text-yellow-600'; // < 20s
-    return 'text-red-600'; // >= 20s
+    if (responseTime < 10000) return 'text-green-600'; // &lt; 10s
+    if (responseTime < 20000) return 'text-yellow-600'; // &lt; 20s
+    return 'text-red-600'; // &gt;= 20s
   };
 
   const formatDate = (date: Date | null) => {
@@ -102,7 +103,7 @@ export function CacheStatus() {
   };
 
   return (
-    <Card className="mb-6 border-dashed">
+    <GlowCard wrapperClassName="mb-6 border-dashed">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Database className="w-5 h-5" />
@@ -381,6 +382,6 @@ export function CacheStatus() {
           </div>
         )}
       </CardContent>
-    </Card>
+    </GlowCard>
   );
 }
