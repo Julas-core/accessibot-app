@@ -69,7 +69,7 @@ export const analyze = api<AnalyzeRequest, AnalyzeResponse>(
   }
 );
 
-async function analyzeHTML(html: string): Promise<AccessibilityIssue[]> {
+export async function analyzeHTML(html: string): Promise<AccessibilityIssue[]> {
   let $: cheerio.CheerioAPI;
   
   try {

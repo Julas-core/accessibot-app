@@ -93,6 +93,17 @@ import {
     createPullRequest as api_accessibot_github_createPullRequest,
     listRepositories as api_accessibot_github_listRepositories
 } from "~backend/accessibot/github";
+import {
+    genericWebhook as api_accessibot_webhook_genericWebhook,
+    githubWebhook as api_accessibot_webhook_githubWebhook
+} from "~backend/accessibot/webhook";
+import { getWebhookDocs as api_accessibot_webhook_docs_getWebhookDocs } from "~backend/accessibot/webhook-docs";
+import {
+    getWebhookAnalyses as api_accessibot_webhook_status_getWebhookAnalyses,
+    getWebhookAnalysis as api_accessibot_webhook_status_getWebhookAnalysis,
+    getWebhookStats as api_accessibot_webhook_status_getWebhookStats,
+    retryWebhookAnalysis as api_accessibot_webhook_status_retryWebhookAnalysis
+} from "~backend/accessibot/webhook-status";
 
 export namespace accessibot {
 
@@ -106,8 +117,15 @@ export namespace accessibot {
             this.cleanupCacheEndpoint = this.cleanupCacheEndpoint.bind(this)
             this.createPullRequest = this.createPullRequest.bind(this)
             this.demoMode = this.demoMode.bind(this)
+            this.genericWebhook = this.genericWebhook.bind(this)
             this.getCacheStatsEndpoint = this.getCacheStatsEndpoint.bind(this)
+            this.getWebhookAnalyses = this.getWebhookAnalyses.bind(this)
+            this.getWebhookAnalysis = this.getWebhookAnalysis.bind(this)
+            this.getWebhookDocs = this.getWebhookDocs.bind(this)
+            this.getWebhookStats = this.getWebhookStats.bind(this)
+            this.githubWebhook = this.githubWebhook.bind(this)
             this.listRepositories = this.listRepositories.bind(this)
+            this.retryWebhookAnalysis = this.retryWebhookAnalysis.bind(this)
         }
 
         /**
@@ -156,6 +174,15 @@ export namespace accessibot {
         }
 
         /**
+         * Generic webhook endpoint for other Git providers
+         */
+        public async genericWebhook(params: RequestType<typeof api_accessibot_webhook_genericWebhook>): Promise<ResponseType<typeof api_accessibot_webhook_genericWebhook>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/generic`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_genericWebhook>
+        }
+
+        /**
          * Get cache statistics and configuration
          */
         public async getCacheStatsEndpoint(): Promise<ResponseType<typeof api_accessibot_cleanup_getCacheStatsEndpoint>> {
@@ -165,12 +192,74 @@ export namespace accessibot {
         }
 
         /**
+         * Get webhook analysis results with pagination
+         */
+        public async getWebhookAnalyses(params: RequestType<typeof api_accessibot_webhook_status_getWebhookAnalyses>): Promise<ResponseType<typeof api_accessibot_webhook_status_getWebhookAnalyses>> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                limit:      params.limit === undefined ? undefined : String(params.limit),
+                page:       params.page === undefined ? undefined : String(params.page),
+                repository: params.repository,
+                status:     params.status,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/analyses`, {query, method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_status_getWebhookAnalyses>
+        }
+
+        /**
+         * Get specific webhook analysis by webhook ID
+         */
+        public async getWebhookAnalysis(params: { webhookId: string }): Promise<ResponseType<typeof api_accessibot_webhook_status_getWebhookAnalysis>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/analyses/${encodeURIComponent(params.webhookId)}`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_status_getWebhookAnalysis>
+        }
+
+        /**
+         * Get webhook setup documentation and examples
+         */
+        public async getWebhookDocs(): Promise<ResponseType<typeof api_accessibot_webhook_docs_getWebhookDocs>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/docs`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_docs_getWebhookDocs>
+        }
+
+        /**
+         * Get webhook analysis statistics
+         */
+        public async getWebhookStats(): Promise<ResponseType<typeof api_accessibot_webhook_status_getWebhookStats>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/stats`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_status_getWebhookStats>
+        }
+
+        /**
+         * GitHub webhook endpoint for push events
+         */
+        public async githubWebhook(params: RequestType<typeof api_accessibot_webhook_githubWebhook>): Promise<ResponseType<typeof api_accessibot_webhook_githubWebhook>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/github`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_githubWebhook>
+        }
+
+        /**
          * Lists user's GitHub repositories.
          */
         public async listRepositories(): Promise<ResponseType<typeof api_accessibot_github_listRepositories>> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/github/repositories`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_github_listRepositories>
+        }
+
+        /**
+         * Retry failed webhook analysis
+         */
+        public async retryWebhookAnalysis(params: { webhookId: string }): Promise<ResponseType<typeof api_accessibot_webhook_status_retryWebhookAnalysis>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/analyses/${encodeURIComponent(params.webhookId)}/retry`, {method: "POST", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_status_retryWebhookAnalysis>
         }
     }
 }
