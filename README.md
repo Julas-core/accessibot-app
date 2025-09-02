@@ -1,10 +1,12 @@
 # AccessiBot
 
-AI-powered web accessibility analysis with intelligent caching, dynamic batch processing, webhook CI/CD integration, multi-provider AI support with automatic fallback and cost optimization — built on Encore.ts with a modern React frontend.
+AI-powered web accessibility analysis with intelligent caching, dynamic batch processing, webhook CI/CD integration, multi-provider AI support with automatic fallback and cost optimization, plus design tool integrations for pre-development accessibility analysis — built on Encore.ts with a modern React frontend.
 
 ## Key Features
 
-- Automated accessibility analysis for HTML content (URL or raw HTML)
+- **Automated accessibility analysis** for HTML content (URL or raw HTML)
+- **Design Tool Integrations** with Figma, Sketch, and Adobe XD for pre-development analysis
+- **Color contrast checking** and component accessibility validation in design files
 - **Multi-Provider AI Enhancement** with OpenAI, Anthropic, and Google support
 - **Automatic Provider Fallback** and cost optimization by selecting the most cost-effective provider
 - Robust DB-backed caching with TTL and demo mode support
@@ -22,7 +24,9 @@ AI-powered web accessibility analysis with intelligent caching, dynamic batch pr
   - accessibot/
     - encore.service.ts
     - analyze.ts
-    - **ai-providers.ts** (NEW: Multi-provider AI management)
+    - **design-analysis.ts** (NEW: Design tool integrations)
+    - **design-demo.ts** (NEW: Design integration status)
+    - **ai-providers.ts** (Multi-provider AI management)
     - ai-service.ts (Enhanced with multi-provider support)
     - cache.ts
     - cache-migrations/
@@ -40,13 +44,14 @@ AI-powered web accessibility analysis with intelligent caching, dynamic batch pr
     - github.ts
     - cleanup.ts
     - cron-cleanup.ts
-    - demo.ts (Enhanced with provider info)
+    - demo.ts (Enhanced with design tool info)
     - batch-stats.ts (Enhanced with provider stats)
-    - **provider-management.ts** (NEW: Provider management endpoints)
+    - **provider-management.ts** (Provider management endpoints)
 - frontend/
-  - App.tsx
+  - App.tsx (Enhanced with design tool demo status)
   - components/
-    - AccessibilityAnalyzer.tsx
+    - AccessibilityAnalyzer.tsx (Enhanced with design tools tab)
+    - **DesignToolsIntegration.tsx** (NEW: Design tool analysis interface)
     - CacheStatus.tsx (Enhanced with provider management)
     - GitHubIntegration.tsx
     - WebhookStatus.tsx
@@ -81,15 +86,43 @@ Service: accessibot
   - weekly-cache-cleanup (Sunday 1:00 AM UTC) → deep cleanup
 
 - Secrets (configured via Infrastructure tab)
-  - **OpenAIKey**: optional; enables OpenAI GPT-4 and GPT-4o-mini models
-  - **AnthropicKey**: optional; enables Claude 3.5 Sonnet and Haiku models
-  - **GoogleKey**: optional; enables Gemini 1.5 Pro and Flash models
-  - GitHubToken: optional; enables real PR creation; when missing, PR flow is simulated
-  - WebhookSecret: optional; GitHub signature verification; if missing, validation is bypassed (demo-friendly)
+  - **AI Providers**:
+    - **OpenAIKey**: optional; enables OpenAI GPT-4 and GPT-4o-mini models
+    - **AnthropicKey**: optional; enables Claude 3.5 Sonnet and Haiku models
+    - **GoogleKey**: optional; enables Gemini 1.5 Pro and Flash models
+  - **Design Tools**:
+    - **FigmaToken**: optional; enables Figma file analysis and browsing
+    - **SketchToken**: optional; enables Sketch file analysis (demo mode available)
+    - **AdobeXDToken**: optional; enables Adobe XD file analysis (demo mode available)
+  - **GitHub Integration**:
+    - GitHubToken: optional; enables real PR creation; when missing, PR flow is simulated
+    - WebhookSecret: optional; GitHub signature verification; if missing, validation is bypassed (demo-friendly)
+
+### Design Tool Integrations
+
+The system now supports design file analysis before development begins:
+
+**Supported Platforms:**
+- **Figma**: Full API integration with file browsing and component analysis
+- **Sketch**: Basic analysis support (demo mode with mock data)
+- **Adobe XD**: Basic analysis support (demo mode with mock data)
+
+**Analysis Features:**
+- **Color Contrast Checking**: Automatically detects text/background combinations and calculates WCAG contrast ratios
+- **Component Accessibility Validation**: Checks for proper naming, semantic structure, and accessibility patterns
+- **Touch Target Analysis**: Validates interactive elements meet minimum size requirements (44px/48dp)
+- **Export Integration**: Provides implementation guidance for developers
+
+**Design Analysis Types:**
+- Color contrast validation with WCAG AA/AAA compliance checking
+- Component naming and semantic structure validation
+- Interactive element sizing and touch target analysis
+- Design pattern accessibility review
+- AI-enhanced recommendations for accessibility improvements
 
 ### Multi-Provider AI System
 
-The system now supports multiple AI providers with intelligent selection and fallback:
+The system supports multiple AI providers with intelligent selection and fallback:
 
 **Supported Providers:**
 - **OpenAI**: GPT-4o ($15/1M tokens), GPT-4o-mini ($1.5/1M tokens)
@@ -116,8 +149,9 @@ The system now supports multiple AI providers with intelligent selection and fal
 
 ### Demo Mode Behavior
 
-- AI: If no AI provider keys are configured, AI responses are replaced with mock suggestions and results are still cached.
-- GitHub: If GitHubToken is not provided, repository list and PR creation are simulated.
+- **AI**: If no AI provider keys are configured, AI responses are replaced with mock suggestions and results are still cached.
+- **GitHub**: If GitHubToken is not provided, repository list and PR creation are simulated.
+- **Design Tools**: If no design tool tokens are configured, mock design files and analysis results are provided.
 
 ## API Endpoints
 
@@ -125,16 +159,25 @@ All endpoints live under the accessibot service.
 
 Public (expose: true) endpoints:
 
-- Analyze and AI status
+- **Analysis and AI status**
   - POST /analyze
     - Body: { url?: string; html?: string }
     - Returns: { issues: AccessibilityIssue[]; summary: { total, high, medium, low } }
   - GET /batch-processor/status
     - Returns current batch stats, priority queue summary, and provider statistics
   - GET /demo-mode
-    - Returns flags for demo mode (AI/GitHub) and list of available providers
+    - Returns flags for demo mode (AI/GitHub/Design Tools) and lists of available providers
 
-- **Provider Management** (NEW)
+- **Design Tool Integrations** (NEW)
+  - POST /design/analyze
+    - Body: { fileUrl?: string; fileId?: string; platform: "figma"|"sketch"|"adobe-xd"; nodeIds?: string[] }
+    - Returns: { issues: DesignAccessibilityIssue[]; summary: {...}; fileInfo: {...} }
+  - GET /design/files/:platform
+    - Returns: { files: DesignFileInfo[]; platform: string }
+  - GET /design/status
+    - Returns design tool connection status
+
+- **Provider Management**
   - GET /providers/stats
     - Returns comprehensive provider statistics and costs
   - POST /providers/reset
@@ -142,14 +185,14 @@ Public (expose: true) endpoints:
   - POST /providers/refresh
     - Refreshes provider configuration to detect new API keys
 
-- Cache management and stats
+- **Cache management and stats**
   - POST /cleanup/cache
     - Body: { intervalDays?: number }
     - Triggers cache cleanup (custom interval or default)
   - GET /cache/stats
     - Returns cache statistics and current config
 
-- Webhooks
+- **Webhooks**
   - POST /webhook/github
     - Expects GitHub push payload
     - Headers: X-Hub-Signature-256, X-GitHub-Event, X-GitHub-Delivery
@@ -161,7 +204,7 @@ Public (expose: true) endpoints:
   - GET /webhook/docs
     - Returns webhook documentation, examples, and setup steps
 
-- Webhook analyses (status & analytics)
+- **Webhook analyses (status & analytics)**
   - GET /webhook/analyses
     - Query: page, limit, status, repository
     - Returns paginated analysis results
@@ -177,12 +220,21 @@ Public (expose: true) endpoints:
   - GET /webhook/performance
     - Real-time metrics snapshot (current hour, last 24h, today's success rate, etc.)
 
-- GitHub integration
+- **GitHub integration**
   - GET /github/repositories
     - Lists repositories for authenticated user (or mock list in demo)
   - POST /github/pull-request
     - Body: { repoOwner, repoName, fixes: [{ fileName, content, issues[] }], title?, description? }
     - Creates a PR on a new branch with provided content (simulated in demo)
+
+## Design Tool Integration Workflow
+
+1. **Connect Design Tools**: Configure API tokens in Infrastructure tab for Figma, Sketch, or Adobe XD
+2. **Browse Design Files**: View and select design files from connected platforms
+3. **Analyze Designs**: Run accessibility analysis on design files before development
+4. **Review Issues**: See color contrast problems, component naming issues, and accessibility violations
+5. **Get Implementation Guidance**: Receive AI-enhanced recommendations for accessible development
+6. **Integrate with Development**: Use analysis results to guide accessible implementation
 
 ## AI, Caching, and Rate Limiting
 
@@ -195,6 +247,13 @@ Public (expose: true) endpoints:
   - Batch processing with dynamic batch size and delay to target response time
   - Priority queuing (high/medium/low severity → higher priority)
   - Robust parsing and error handling for AI responses
+
+- **Design Analysis**
+  - Figma API integration for live file analysis
+  - Color contrast calculation using WCAG standards
+  - Component accessibility pattern recognition
+  - Touch target size validation
+  - AI-enhanced design recommendations
 
 - Cache
   - DB table: ai_fixes(issue_hash, fixed_code_snippet, created_at)
@@ -223,25 +282,33 @@ Note: In this demo, file contents are simulated. Integrating real repository fil
 
 ## Frontend
 
-- AccessibilityAnalyzer
+- **AccessibilityAnalyzer** (Enhanced)
   - URL/HTML analysis
+  - **Design Tool Integration** tab for analyzing design files
   - Displays issues and AI-enhanced fixes with provider information
   - GitHub PR creation UI
   - Cache status and batch processor stats
 
-- CacheStatus (Enhanced)
+- **DesignToolsIntegration** (NEW)
+  - Platform selection (Figma, Sketch, Adobe XD)
+  - Design file browsing and selection
+  - Color contrast analysis with visual representation
+  - Component accessibility validation
+  - AI-enhanced implementation guidance
+
+- **CacheStatus** (Enhanced)
   - Multi-provider AI statistics with cost tracking
   - Provider management (reset/refresh)
   - Individual provider performance metrics
   - Cache statistics and cleanup controls
   - Batch processor monitoring
 
-- WebhookStatus
+- **WebhookStatus**
   - Overview metrics, recent analyses with filters and retry
   - Analytics dashboard with trends, repository performance, processing times
   - Docs and setup guidance for webhooks
 
-- UI/UX
+- **UI/UX**
   - Tailwind v4 and shadcn/ui for components
   - Animated backgrounds (squares), glowing accent effects
   - Responsive design, subtle animations, dark-friendly color tokens
@@ -254,12 +321,17 @@ Configure secrets in the Infrastructure tab:
   - OpenAIKey: Enables OpenAI GPT-4o and GPT-4o-mini models
   - AnthropicKey: Enables Claude 3.5 Sonnet and Haiku models
   - GoogleKey: Enables Gemini 1.5 Pro and Flash models
-- GitHubToken
-  - Enables real repository listing and PR creation; otherwise simulated
-- WebhookSecret
-  - Enables GitHub webhook signature validation (X-Hub-Signature-256)
 
-If no AI provider secrets are set, the system gracefully falls back to demo mode.
+- **Design Tools** (optional, demo mode available):
+  - FigmaToken: Enables Figma file analysis and browsing
+  - SketchToken: Enables Sketch file analysis (limited support)
+  - AdobeXDToken: Enables Adobe XD file analysis (limited support)
+
+- **GitHub Integration**:
+  - GitHubToken: Enables real repository listing and PR creation; otherwise simulated
+  - WebhookSecret: Enables GitHub webhook signature validation (X-Hub-Signature-256)
+
+If no provider secrets are set, the system gracefully falls back to demo mode.
 
 ## Cost Optimization Features
 
@@ -275,8 +347,20 @@ If no AI provider secrets are set, the system gracefully falls back to demo mode
 
 - **Performance-Based Selection**: Temporarily disables unreliable providers to avoid wasted costs
 
+## Design Tool Features
+
+- **Pre-Development Analysis**: Catch accessibility issues before code is written
+- **Color Contrast Validation**: WCAG AA/AAA compliance checking with visual feedback
+- **Component Review**: Semantic naming and structure validation
+- **Touch Target Analysis**: Interactive element sizing validation
+- **Cross-Platform Support**: Figma, Sketch, and Adobe XD integration
+- **Implementation Guidance**: AI-enhanced recommendations for accessible development
+
 ## Extensibility Notes
 
+- Additional design tool integrations can be added to design-analysis.ts
+- Color contrast algorithms can be enhanced for more complex scenarios
+- Component accessibility patterns can be expanded based on design system needs
 - Additional AI providers can be easily added to ai-providers.ts
 - Cost optimization algorithms can be tuned based on usage patterns
 - Provider-specific features (like function calling) can be added per provider
@@ -287,6 +371,8 @@ If no AI provider secrets are set, the system gracefully falls back to demo mode
 
 ## Limitations
 
+- Sketch and Adobe XD integrations are limited to demo mode (API limitations)
+- Design analysis is based on color/structure inspection, not interactive behavior
 - Webhook processor uses sample HTML (demo) instead of live repo content
 - No authentication by default (by design)
 - AI output is best-effort; always validate changes before merging
@@ -296,7 +382,8 @@ If no AI provider secrets are set, the system gracefully falls back to demo mode
 
 The backend uses native TypeScript interfaces for request/response schemas, ensuring type safety in the frontend via ~backend imports. Examples:
 
-- AccessibilityIssue (analyze.ts)
+- AccessibilityIssue, DesignAccessibilityIssue (analyze.ts, design-analysis.ts)
+- ColorContrastIssue, DesignFileInfo (design-analysis.ts)
 - BatchProcessorInfo with provider stats (batch-stats.ts)
 - ProviderStatsResponse (provider-management.ts)
 - WebhookAnalysisResult (webhook-processor.ts)
@@ -306,7 +393,9 @@ The backend uses native TypeScript interfaces for request/response schemas, ensu
 ## Safety and Security
 
 - GitHub webhook signature validation (HMAC-SHA256) when WebhookSecret is configured
+- Design tool API token security through Encore.ts secret management
 - Robust API error handling via Encore.ts APIError
 - No secrets in code; all secrets managed through the platform's Infrastructure tab
 - Provider isolation: failures in one provider don't affect others
 - Cost controls through rate limiting and provider management
+- Input validation for design file URLs and parameters

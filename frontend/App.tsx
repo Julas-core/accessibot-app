@@ -16,7 +16,7 @@ function AppInner() {
     staleTime: 60_000,
   });
 
-  const showBanner = !!(data?.demoMode || data?.githubDemo);
+  const showBanner = !!(data?.demoMode || data?.githubDemo || data?.designToolsDemo);
 
   return (
     <div className="min-h-screen bg-[#060606] relative overflow-hidden">
@@ -32,7 +32,7 @@ function AppInner() {
         <div className="w-full">
           <div className="container mx-auto px-4 pt-4">
             <div className="rounded-md border border-yellow-300 bg-yellow-100 text-yellow-900 dark:bg-yellow-950 dark:text-yellow-100 dark:border-yellow-800 px-4 py-3 text-sm">
-              ⚠️ Running in Demo Mode – AI and/or GitHub responses are simulated.
+              ⚠️ Running in Demo Mode – AI{data?.githubDemo ? ', GitHub' : ''}{data?.designToolsDemo ? ', and/or Design Tool' : ''} responses are simulated.
             </div>
           </div>
         </div>

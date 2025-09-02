@@ -6,17 +6,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, AlertTriangle, CheckCircle, XCircle, Code2, Zap, Database, Webhook } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, XCircle, Code2, Zap, Database, Webhook, Palette } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import backend from '~backend/client';
 import type { AnalyzeResponse, AccessibilityIssue } from '~backend/accessibot/analyze';
 import { GitHubIntegration } from './GitHubIntegration';
 import { CacheStatus } from './CacheStatus';
 import { WebhookStatus } from './WebhookStatus';
+import { DesignToolsIntegration } from './DesignToolsIntegration';
 import { GlowCard } from './GlowCard';
 
 export function AccessibilityAnalyzer() {
-  const [activeTab, setActiveTab] = useState<'analyze' | 'webhook'>('analyze');
+  const [activeTab, setActiveTab] = useState<'analyze' | 'design' | 'webhook'>('analyze');
   const [inputType, setInputType] = useState<'url' | 'html'>('url');
   const [url, setUrl] = useState('');
   const [html, setHtml] = useState('');
@@ -95,7 +96,7 @@ export function AccessibilityAnalyzer() {
 
   // Handlers to avoid inline union type assertions inside JSX attributes
   const handleMainTabChange = (value: string) => {
-    setActiveTab(value as 'analyze' | 'webhook');
+    setActiveTab(value as 'analyze' | 'design' | 'webhook');
   };
   const handleInputTabChange = (value: string) => {
     setInputType(value as 'url' | 'html');
@@ -106,12 +107,12 @@ export function AccessibilityAnalyzer() {
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-foreground mb-4">AccessiBot</h1>
         <p className="text-xl text-muted-foreground mb-4">
-          AI-powered web accessibility analysis with intelligent caching &amp; CI/CD integration
+          AI-powered web accessibility analysis with design tool integrations &amp; CI/CD automation
         </p>
         <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-blue-500" />
-            <span>Rate-Limited AI Processing</span>
+            <span>Multi-Provider AI Processing</span>
           </div>
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-green-500" />
@@ -119,7 +120,11 @@ export function AccessibilityAnalyzer() {
           </div>
           <div className="flex items-center gap-2">
             <Webhook className="w-4 h-4 text-purple-500" />
-            <span>Webhook CI/CD Integration</span>
+            <span>CI/CD Integration</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Palette className="w-4 h-4 text-pink-500" />
+            <span>Design Tool Analysis</span>
           </div>
         </div>
       </div>
@@ -129,14 +134,18 @@ export function AccessibilityAnalyzer() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={handleMainTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="analyze" className="flex items-center gap-2">
             <Code2 className="w-4 h-4" />
             Manual Analysis
           </TabsTrigger>
+          <TabsTrigger value="design" className="flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            Design Tools
+          </TabsTrigger>
           <TabsTrigger value="webhook" className="flex items-center gap-2">
             <Webhook className="w-4 h-4" />
-            Webhook Integration
+            CI/CD Integration
           </TabsTrigger>
         </TabsList>
 
@@ -317,6 +326,10 @@ export function AccessibilityAnalyzer() {
               )}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="design" className="space-y-6">
+          <DesignToolsIntegration />
         </TabsContent>
 
         <TabsContent value="webhook" className="space-y-6">

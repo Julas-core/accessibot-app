@@ -90,6 +90,11 @@ import {
 } from "~backend/accessibot/cleanup";
 import { demoMode as api_accessibot_demo_demoMode } from "~backend/accessibot/demo";
 import {
+    analyzeDesignFile as api_accessibot_design_analysis_analyzeDesignFile,
+    listDesignFiles as api_accessibot_design_analysis_listDesignFiles
+} from "~backend/accessibot/design-analysis";
+import { getDesignIntegrationStatus as api_accessibot_design_demo_getDesignIntegrationStatus } from "~backend/accessibot/design-demo";
+import {
     createPullRequest as api_accessibot_github_createPullRequest,
     listRepositories as api_accessibot_github_listRepositories
 } from "~backend/accessibot/github";
@@ -122,12 +127,14 @@ export namespace accessibot {
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
             this.analyze = this.analyze.bind(this)
+            this.analyzeDesignFile = this.analyzeDesignFile.bind(this)
             this.batchProcessorStatus = this.batchProcessorStatus.bind(this)
             this.cleanupCacheEndpoint = this.cleanupCacheEndpoint.bind(this)
             this.createPullRequest = this.createPullRequest.bind(this)
             this.demoMode = this.demoMode.bind(this)
             this.genericWebhook = this.genericWebhook.bind(this)
             this.getCacheStatsEndpoint = this.getCacheStatsEndpoint.bind(this)
+            this.getDesignIntegrationStatus = this.getDesignIntegrationStatus.bind(this)
             this.getProviderStatsEndpoint = this.getProviderStatsEndpoint.bind(this)
             this.getWebhookAnalyses = this.getWebhookAnalyses.bind(this)
             this.getWebhookAnalysis = this.getWebhookAnalysis.bind(this)
@@ -136,6 +143,7 @@ export namespace accessibot {
             this.getWebhookPerformanceMetrics = this.getWebhookPerformanceMetrics.bind(this)
             this.getWebhookStats = this.getWebhookStats.bind(this)
             this.githubWebhook = this.githubWebhook.bind(this)
+            this.listDesignFiles = this.listDesignFiles.bind(this)
             this.listRepositories = this.listRepositories.bind(this)
             this.refreshProvidersEndpoint = this.refreshProvidersEndpoint.bind(this)
             this.resetProvidersEndpoint = this.resetProvidersEndpoint.bind(this)
@@ -149,6 +157,15 @@ export namespace accessibot {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/analyze`, {method: "POST", body: JSON.stringify(params)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_analyze_analyze>
+        }
+
+        /**
+         * Analyzes design files for accessibility issues before development.
+         */
+        public async analyzeDesignFile(params: RequestType<typeof api_accessibot_design_analysis_analyzeDesignFile>): Promise<ResponseType<typeof api_accessibot_design_analysis_analyzeDesignFile>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/design/analyze`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_design_analysis_analyzeDesignFile>
         }
 
         /**
@@ -179,7 +196,7 @@ export namespace accessibot {
         }
 
         /**
-         * Returns whether the app is running in demo mode for AI and GitHub, and lists available providers.
+         * Returns whether the app is running in demo mode for various integrations.
          */
         public async demoMode(): Promise<ResponseType<typeof api_accessibot_demo_demoMode>> {
             // Now make the actual call to the API
@@ -203,6 +220,15 @@ export namespace accessibot {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/cache/stats`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_cleanup_getCacheStatsEndpoint>
+        }
+
+        /**
+         * Returns the connection status for design tool integrations.
+         */
+        public async getDesignIntegrationStatus(): Promise<ResponseType<typeof api_accessibot_design_demo_getDesignIntegrationStatus>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/design/status`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_design_demo_getDesignIntegrationStatus>
         }
 
         /**
@@ -290,6 +316,15 @@ export namespace accessibot {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/webhook/github`, {method: "POST", body: JSON.stringify(params)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_githubWebhook>
+        }
+
+        /**
+         * Lists design files from connected platforms.
+         */
+        public async listDesignFiles(params: { platform: string }): Promise<ResponseType<typeof api_accessibot_design_analysis_listDesignFiles>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/design/files/${encodeURIComponent(params.platform)}`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_design_analysis_listDesignFiles>
         }
 
         /**
