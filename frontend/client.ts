@@ -97,6 +97,10 @@ import {
     genericWebhook as api_accessibot_webhook_genericWebhook,
     githubWebhook as api_accessibot_webhook_githubWebhook
 } from "~backend/accessibot/webhook";
+import {
+    getWebhookAnalytics as api_accessibot_webhook_analytics_getWebhookAnalytics,
+    getWebhookPerformanceMetrics as api_accessibot_webhook_analytics_getWebhookPerformanceMetrics
+} from "~backend/accessibot/webhook-analytics";
 import { getWebhookDocs as api_accessibot_webhook_docs_getWebhookDocs } from "~backend/accessibot/webhook-docs";
 import {
     getWebhookAnalyses as api_accessibot_webhook_status_getWebhookAnalyses,
@@ -121,7 +125,9 @@ export namespace accessibot {
             this.getCacheStatsEndpoint = this.getCacheStatsEndpoint.bind(this)
             this.getWebhookAnalyses = this.getWebhookAnalyses.bind(this)
             this.getWebhookAnalysis = this.getWebhookAnalysis.bind(this)
+            this.getWebhookAnalytics = this.getWebhookAnalytics.bind(this)
             this.getWebhookDocs = this.getWebhookDocs.bind(this)
+            this.getWebhookPerformanceMetrics = this.getWebhookPerformanceMetrics.bind(this)
             this.getWebhookStats = this.getWebhookStats.bind(this)
             this.githubWebhook = this.githubWebhook.bind(this)
             this.listRepositories = this.listRepositories.bind(this)
@@ -218,12 +224,37 @@ export namespace accessibot {
         }
 
         /**
+         * Get comprehensive webhook analytics with time range filtering
+         */
+        public async getWebhookAnalytics(params: RequestType<typeof api_accessibot_webhook_analytics_getWebhookAnalytics>): Promise<ResponseType<typeof api_accessibot_webhook_analytics_getWebhookAnalytics>> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                endDate:    params.endDate,
+                repository: params.repository,
+                startDate:  params.startDate,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/analytics`, {query, method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_analytics_getWebhookAnalytics>
+        }
+
+        /**
          * Get webhook setup documentation and examples
          */
         public async getWebhookDocs(): Promise<ResponseType<typeof api_accessibot_webhook_docs_getWebhookDocs>> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/webhook/docs`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_docs_getWebhookDocs>
+        }
+
+        /**
+         * Get real-time performance metrics for dashboard overview
+         */
+        public async getWebhookPerformanceMetrics(): Promise<ResponseType<typeof api_accessibot_webhook_analytics_getWebhookPerformanceMetrics>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/webhook/performance`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_accessibot_webhook_analytics_getWebhookPerformanceMetrics>
         }
 
         /**
